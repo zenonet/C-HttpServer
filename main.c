@@ -8,17 +8,24 @@
 
 #define PORT 8080
 
-enum HttpMethod : char{
+typedef enum HttpMethod : char{
     GET,
     POST,
     PUT,
     DELETE
-};
+} HttpMethod;
 
+typedef struct HttpHeader{
+    char* headerName;
+    char* value;
+} HttpHeader;
 
 typedef struct HttpRequest{
     enum HttpMethod method;
     char* uri;
+    HttpHeader* headers;
+    int headerCount;
+
     int clientSocket;
     char isClosed;
 } HttpRequest;
@@ -63,10 +70,15 @@ HttpResponse* myHandler(HttpRequest* request){
 
     if(!strcmp(request->uri, "/close")){
         printf("Terminating because /close endpoint was called..\n");
+        close(request->clientSocket);
         close(serverSocket);
         exit(0);
     }
     printf("Receved request for '%s'\n", request->uri);
+
+    for(int i=0;i<request->headerCount;i++){
+        //printf("Got header '%s' with value '%s'\n", request->headers[i].headerName, request->headers[i].value);
+    }
     HttpResponse* response = malloc(sizeof(HttpResponse));
     response->body = "Hello Hackclub! <br><a href=\"/close\">Close server</a>";
     response->statusCode = 200;
@@ -100,26 +112,65 @@ int main(){
         int clientSocket = accept(serverSocket, 0, 0);
     
         char buffer[1024] = {0};
-        recv(clientSocket, buffer, sizeof(buffer), 0);
-        // std::cout << "Message from client: " << buffer << '\n';
+        int length = recv(clientSocket, buffer, sizeof(buffer), 0);
+        printf("Request size: %d\n", length);
 
-        // Parse header
+        // Parse status line :
         int methodLength = 0;
         while(methodLength < sizeof(buffer) && buffer[methodLength] != ' ') methodLength++;
         char* method = (char*) malloc(methodLength+1);
         memcpy(method, &buffer, methodLength);
         method[methodLength] = 0;
 
+        // Parse URI:
         int uriLength = 0;
         while(uriLength + methodLength + 1 < sizeof(buffer) && buffer[uriLength+methodLength+1] != ' ') uriLength++; 
         char* uri = (char*) malloc(uriLength);
         memcpy(uri, &buffer[methodLength+1], uriLength+1);
         uri[uriLength] = 0;
 
+        // Parse request headers:
+        int headerCount = 0;
+        int i = methodLength+1+uriLength+1;
+        for(;i < length;i++){ // Count how many request headers there are
+            if(buffer[i] != '\n') continue; 
+            if(buffer[i+1] == '\n') break;
+            headerCount++;
+        }
+        printf("--------------------------------------------------------Header count: %d--------------------------------------------\n", headerCount);
+
+        int endOfHeaders = i;
+
+        HttpHeader* headers = malloc(sizeof(HttpHeader)*headerCount); // Allocate accordingly
+        i = methodLength+1+uriLength+2;
+        int startOfLine = i;
+        int currentHeader = 0;
+        int colonIndex = -1; // Colon index relative to the start of the line
+        for(; i<endOfHeaders; i++){
+            if(buffer[i] == '\n'){ // If header line is complete
+                char* header = malloc(i-startOfLine); // Yes, this means there is also space for the line break but we need that for a null terminator anyway
+                memcpy(header, &buffer[startOfLine], i-1-startOfLine);
+                header[colonIndex] = 0; // Make the colon a null char to terminate the header name
+                header[i-startOfLine-1] = 0; // Add null terminator to the header value
+
+                char* value = header + colonIndex + 1; // Get a pointer to the value
+                printf("Set second null terminator at %d. Colon is at %d\n", i-startOfLine-1, colonIndex);
+                // exit(0);
+                headers[currentHeader].headerName = header;
+                headers[currentHeader++].value = value;
+                printf("Value: %s\n", &header[colonIndex+1]);
+                colonIndex = -1;
+            }
+            if(buffer[i] == ':') colonIndex = i - startOfLine;
+        }
+
+
         struct HttpRequest* request = (struct HttpRequest*)malloc(sizeof(struct HttpRequest));
         request->isClosed = 0;
         request->clientSocket = clientSocket;
         request->uri = uri;
+        request->headers = headers;
+        request->headerCount = headerCount;
 
         // translate method string to enum value
         if(strcmp(method, "GET")) request->method = GET;
