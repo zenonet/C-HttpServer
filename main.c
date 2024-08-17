@@ -1,4 +1,5 @@
  
+#include <ctype.h>
 #include <netinet/in.h> 
 #include <stdio.h>
 #include <string.h>
@@ -71,13 +72,14 @@ HttpResponse* myHandler(HttpRequest* request){
     if(!strcmp(request->uri, "/close")){
         printf("Terminating because /close endpoint was called..\n");
         close(request->clientSocket);
-        close(serverSocket);
+        //close(serverSocket);
+        shutdown(serverSocket, SHUT_RDWR);
         exit(0);
     }
     printf("Receved request for '%s'\n", request->uri);
 
     for(int i=0;i<request->headerCount;i++){
-        //printf("Got header '%s' with value '%s'\n", request->headers[i].headerName, request->headers[i].value);
+        printf("Got header '%s' with value '%s'\n", request->headers[i].headerName, request->headers[i].value);
     }
     HttpResponse* response = malloc(sizeof(HttpResponse));
     response->body = "Hello Hackclub! <br><a href=\"/close\">Close server</a>";
@@ -129,40 +131,46 @@ int main(){
         memcpy(uri, &buffer[methodLength+1], uriLength+1);
         uri[uriLength] = 0;
 
+        int i = methodLength+1+uriLength+1;
+        // Go forward to the next line
+        while(buffer[i-1] != '\n') i++;
         // Parse request headers:
         int headerCount = 0;
-        int i = methodLength+1+uriLength+1;
         for(;i < length;i++){ // Count how many request headers there are
             if(buffer[i] != '\n') continue; 
-            if(buffer[i+1] == '\n') break;
+            if(buffer[(i)+1] == '\n') break;
             headerCount++;
         }
-        printf("--------------------------------------------------------Header count: %d--------------------------------------------\n", headerCount);
 
         int endOfHeaders = i;
 
         HttpHeader* headers = malloc(sizeof(HttpHeader)*headerCount); // Allocate accordingly
-        i = methodLength+1+uriLength+2;
+        i = methodLength+1+uriLength;
+
         int startOfLine = i;
         int currentHeader = 0;
         int colonIndex = -1; // Colon index relative to the start of the line
         for(; i<endOfHeaders; i++){
             if(buffer[i] == '\n'){ // If header line is complete
+                if(startOfLine == i-1) break; // If this is the second line break in a row, break from the loop
+
                 char* header = malloc(i-startOfLine); // Yes, this means there is also space for the line break but we need that for a null terminator anyway
                 memcpy(header, &buffer[startOfLine], i-1-startOfLine);
-                header[colonIndex] = 0; // Make the colon a null char to terminate the header name
+                
                 header[i-startOfLine-1] = 0; // Add null terminator to the header value
 
+                header[colonIndex] = 0; // Make the colon a null char to terminate the header name
                 char* value = header + colonIndex + 1; // Get a pointer to the value
-                printf("Set second null terminator at %d. Colon is at %d\n", i-startOfLine-1, colonIndex);
-                // exit(0);
+                while(value < header+(i-startOfLine-1) && isspace(*value) && *value != '\n') value++; // Skip any whitespace after the semicolon
                 headers[currentHeader].headerName = header;
                 headers[currentHeader++].value = value;
-                printf("Value: %s\n", &header[colonIndex+1]);
                 colonIndex = -1;
+
+               startOfLine = i+1; 
             }
-            if(buffer[i] == ':') colonIndex = i - startOfLine;
+            if(buffer[i] == ':' && colonIndex == -1) colonIndex = i - startOfLine;
         }
+        // headerCount = currentHeader;
 
 
         struct HttpRequest* request = (struct HttpRequest*)malloc(sizeof(struct HttpRequest));
