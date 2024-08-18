@@ -1,10 +1,13 @@
-
 #include <ctype.h>
+#include <linux/time.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PORT 8080
@@ -13,7 +16,7 @@ typedef enum HttpMethod : char { GET, POST, PUT, DELETE } HttpMethod;
 
 typedef struct HttpHeader {
 	char *headerName;
-	char *value;
+    char *value;
 } HttpHeader;
 
 typedef struct HttpRequest {
@@ -35,11 +38,25 @@ typedef struct HttpResponse {
 
 typedef HttpResponse *(*httpRequestHandler)(HttpRequest *);
 
+
+long swStart(){
+    struct timespec spec;
+    clock_gettime(CLOCK_REALTIME, &spec);
+    return spec.tv_nsec;
+}
+double swStop(long start){
+    return ((double)swStart() - (double)start)/1000;
+}
+
 int serverSocket;
 
 char *getResponseString(HttpResponse *response) {
+    long serialierSw = swStart();
+
 	if (response->statusCode < 0 || response->statusCode > 999)
 		return NULL;
+
+    long statusSw = swStart();
 	int bodyLength = strlen(response->body);
 	char statusLine[] = "HTTP/1.0 XXX OK\n";
 	int statusLineLength = sizeof(statusLine) - 1;
@@ -54,44 +71,48 @@ char *getResponseString(HttpResponse *response) {
 							   strlen(response->headers[i].value + 1);
 	}
 
+    printf("    Generating status line and calculating needed space took %fms\n", swStop(statusSw));
+    
 	char *responseString =
 		malloc(statusLineLength + headerSectionLength + 1 + bodyLength + 1);
 
 	// Copy the status line to the response string
 	memcpy(responseString, statusLine, statusLineLength);
 
+    long headerSw = swStart();
 	// Serialize headers
-	int pos = statusLineLength + 1;
+	int pos = statusLineLength;
 	for (int i = 0; i < response->headerCount; i++) {
 		int nameLength = strlen(response->headers[i].headerName);
 		int valueLength = strlen(response->headers[i].value);
 
 		memcpy(responseString + pos, response->headers[i].headerName,
 			   nameLength);
-		pos += nameLength + 1;
+		pos += nameLength;
 
 		responseString[pos++] = ':';
 
 		memcpy(responseString + pos, response->headers[i].value, valueLength);
-		pos += valueLength + 1;
+		pos += valueLength;
 		responseString[pos++] = '\n';
 	}
 	responseString[pos++] = '\n';
+    printf("    Serializing headers took %fms\n", swStop(headerSw));
 
 	// Copy the response body to the response string
-	printf("Copying body to responseString + %d\n", pos);
 	memcpy(responseString + pos, response->body, bodyLength);
 	pos += bodyLength;
 	responseString[pos++] = 0;
-	printf("Response length: %lu\n", strlen(responseString));
-	printf("Response:\n%s\n", responseString);
+	// printf("Response length: %lu\n", strlen(responseString));
+    printf("Response serialization took %fms in total\n", swStop(serialierSw));
 	return responseString;
 }
 
 void sendResponse(struct HttpRequest *request, struct HttpResponse *response) {
 	char *responseString = getResponseString(response);
+    long sendSw = swStart();
 	send(request->clientSocket, responseString, strlen(responseString), 0);
-	printf("Sent response\n");
+    printf("Sent response in %fms\n", swStop(sendSw));
 	free(responseString);
 }
 
@@ -106,13 +127,19 @@ HttpResponse *myHandler(HttpRequest *request) {
 	}
 	printf("Receved request for '%s'\n", request->uri);
 
+    /*
 	for (int i = 0; i < request->headerCount; i++) {
 		// printf("Got header '%s' with value '%s'\n",
 		// request->headers[i].headerName, request->headers[i].value);
 	}
+    */
 	HttpResponse *response = malloc(sizeof(HttpResponse));
 	response->body = "Hello Hackclub! <br><a href=\"/close\">Close server</a>";
 	response->statusCode = 200;
+    response->headers = malloc(sizeof(HttpHeader));
+    response->headers[0].headerName = "Content-Type";
+    response->headers[0].value = "text/html";
+    response->headerCount = 1;
 	return response;
 }
 
@@ -146,7 +173,8 @@ int main() {
 		char buffer[1024] = {0};
 		int length = recv(clientSocket, buffer, sizeof(buffer), 0);
 		printf("Request size: %d\n", length);
-
+        
+        long sw = swStart();
 		// Parse status line :
 		int methodLength = 0;
 		while (methodLength < sizeof(buffer) && buffer[methodLength] != ' ')
@@ -218,7 +246,6 @@ int main() {
 			if (buffer[i] == ':' && colonIndex == -1)
 				colonIndex = i - startOfLine;
 		}
-		// headerCount = currentHeader;
 
 		struct HttpRequest *request =
 			(struct HttpRequest *)malloc(sizeof(struct HttpRequest));
@@ -237,10 +264,15 @@ int main() {
 			request->method = PUT;
 		if (strcmp(method, "DELETE"))
 			request->method = DELETE;
-
+        printf("Parsing took %fms\n", swStop(sw));
 		HttpResponse *response = globalHandler(request);
 
+        long sendSw = swStart();
 		sendResponse(request, response);
+        printf("Serializing and sending took %fms\n", swStop(sendSw));
+
+        printf("Process request took %fms\n", swStop(sw));
+
 		close(request->clientSocket);
 		request->isClosed = 1;
 
