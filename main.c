@@ -1,13 +1,13 @@
 #include <ctype.h>
-#include <linux/time.h>
+// #include <linux/time.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/time.h>
-#include <time.h>
+// #include <sys/time.h>
+// #include <time.h>
 #include <unistd.h>
 
 #define PORT 8080
@@ -50,7 +50,7 @@ double swStop(long start){
 
 int serverSocket;
 
-char *getResponseString(HttpResponse *response) {
+char *getResponseString(HttpResponse *response, int* respLenPtr) {
     long serialierSw = swStart();
 
 	if (response->statusCode < 0 || response->statusCode > 999)
@@ -73,8 +73,9 @@ char *getResponseString(HttpResponse *response) {
 
     printf("    Generating status line and calculating needed space took %fms\n", swStop(statusSw));
     
+    *respLenPtr = statusLineLength + headerSectionLength + 1 + bodyLength + 1;
 	char *responseString =
-		malloc(statusLineLength + headerSectionLength + 1 + bodyLength + 1);
+		malloc(*respLenPtr);
 
 	// Copy the status line to the response string
 	memcpy(responseString, statusLine, statusLineLength);
@@ -109,11 +110,12 @@ char *getResponseString(HttpResponse *response) {
 }
 
 void sendResponse(struct HttpRequest *request, struct HttpResponse *response) {
-	char *responseString = getResponseString(response);
+    int respLen;
+	char *responseString = getResponseString(response, &respLen);
     long sendSw = swStart();
-	send(request->clientSocket, responseString, strlen(responseString), 0);
-    printf("Sent response in %fms\n", swStop(sendSw));
+	send(request->clientSocket, responseString, respLen, 0);
 	free(responseString);
+    printf("Sent response in %fms\n", swStop(sendSw));
 }
 
 HttpResponse *myHandler(HttpRequest *request) {
@@ -163,6 +165,9 @@ int main() {
 		printf("Unable to bind socket for port %d. Terminating...\n", PORT);
 		return 1;
 	}
+    
+    int one = 1;
+    // setsockopt(descriptor, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 
 	listen(serverSocket, 5);
 	printf("Now listening...\n");
