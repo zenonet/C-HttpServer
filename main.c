@@ -49,6 +49,7 @@ double swStop(long start){
 }
 
 int serverSocket;
+long requestSw = -1;
 
 char *getResponseString(HttpResponse *response, int* respLenPtr) {
     long serialierSw = swStart();
@@ -120,28 +121,39 @@ void sendResponse(struct HttpRequest *request, struct HttpResponse *response) {
 
 HttpResponse *myHandler(HttpRequest *request) {
 
-	if (!strcmp(request->uri, "/close")) {
-		printf("Terminating because /close endpoint was called..\n");
-		close(request->clientSocket);
-		// close(serverSocket);
-		shutdown(serverSocket, SHUT_RDWR);
-		exit(0);
-	}
 	printf("Receved request for '%s'\n", request->uri);
+    char* body;
+	if (!strcmp(request->uri, "/amogus")) {
+		body = "Is it just me or is this endpoint kinda sus...";
+	}else{
+        const char bodyTemplate[] = "<body style=\"font-family:sans-serif;padding:24pt;ddisplay:flex; margin: auto;background:black;color:white;flex-direction:column;\"><h2>Hello Hackclub!</h2><p>I wrote this HTTP server in pure C as a challenge. Additionally this server was completely developed in NeoVim in Termux on an Android Tablet with a physical keyboard. It was kinda fun!</p><p>Unfortunately, the server is kinda slow (even though it's written in pure C). That's probably because I am a bad programmer but also because writing to the socket stream using the send() function takes forever apparently. (largest write-time I've seen was ~250ms)</p><p>As of writing this to a char*, %d ms have passed since I received your request.</p></body>";
 
+        body = malloc(sizeof bodyTemplate+30);
+        // memcpy(body, bodyTemplate, sizeof bodyTemplate);
+
+        // Insert time into the message
+        int ms = (int)swStop(requestSw);
+        if(ms < 1000)
+            sprintf(body, bodyTemplate, ms);
+        printf("Full body:\n%s\n", body);
+    }
     /*
 	for (int i = 0; i < request->headerCount; i++) {
 		// printf("Got header '%s' with value '%s'\n",
 		// request->headers[i].headerName, request->headers[i].value);
 	}
     */
+
 	HttpResponse *response = malloc(sizeof(HttpResponse));
-	response->body = "Hello Hackclub! <br><a href=\"/close\">Close server</a>";
+	response->body = body;
 	response->statusCode = 200;
-    response->headers = malloc(sizeof(HttpHeader));
+    #define HEADER_COUNT 2
+    response->headers = malloc(sizeof(HttpHeader) * HEADER_COUNT);
     response->headers[0].headerName = "Content-Type";
     response->headers[0].value = "text/html";
-    response->headerCount = 1;
+    response->headers[1].headerName = "Server";
+    response->headers[1].value = "zenonet's pure C HTTP server";
+    response->headerCount = HEADER_COUNT;
 	return response;
 }
 
@@ -166,7 +178,7 @@ int main() {
 		return 1;
 	}
     
-    int one = 1;
+    // int one = 1;
     // setsockopt(descriptor, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 
 	listen(serverSocket, 5);
@@ -180,6 +192,7 @@ int main() {
 		printf("Request size: %d\n", length);
         
         long sw = swStart();
+        requestSw = sw;
 		// Parse status line :
 		int methodLength = 0;
 		while (methodLength < sizeof(buffer) && buffer[methodLength] != ' ')
