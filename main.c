@@ -126,9 +126,9 @@ HttpResponse *myHandler(HttpRequest *request) {
 	if (!strcmp(request->uri, "/amogus")) {
 		body = "Is it just me or is this endpoint kinda sus...";
 	}else{
-        const char bodyTemplate[] = "<body style=\"font-family:sans-serif;padding:24pt;ddisplay:flex; margin: auto;background:black;color:white;flex-direction:column;\"><h2>Hello Hackclub!</h2><p>I wrote this HTTP server in pure C as a challenge. Additionally this server was completely developed in NeoVim in Termux on an Android Tablet with a physical keyboard. It was kinda fun!</p><p>Unfortunately, the server is kinda slow (even though it's written in pure C). That's probably because I am a bad programmer but also because writing to the socket stream using the send() function takes forever apparently. (largest write-time I've seen was ~250ms)</p><p>As of writing this to a char*, %d ms have passed since I received your request.</p></body>";
+        const char bodyTemplate[] = "<body style=\"font-family:sans-serif;padding:24pt;ddisplay:flex; margin: auto;background:black;color:white;flex-direction:column;\"><h2>Hello Hackclub!</h2><p>I wrote this HTTP server in pure C as a challenge. Additionally this server was completely developed in NeoVim in Termux on an Android Tablet with a physical keyboard. It was kinda fun! The source-code is available <a href=\"https://github.com/zenonet/cppHttpServer\">here</a>.</p><p>Unfortunately, the server is kinda slow (even though it's written in pure C). That's probably because I am a bad programmer but also because writing to the socket stream using the send() function takes forever apparently. (largest write-time I've seen was ~250ms)</p><p>As of writing this to a char*, %d ms have passed since I received your request.</p></body>";
 
-        body = malloc(sizeof bodyTemplate+30);
+        body = malloc(sizeof bodyTemplate+5);
         // memcpy(body, bodyTemplate, sizeof bodyTemplate);
 
         // Insert time into the message
