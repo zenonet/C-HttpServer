@@ -294,13 +294,22 @@ int main() {
 		close(request->clientSocket);
 		request->isClosed = 1;
 
-		// quit = !strcmp(request->uri, "/close");
+        free(request->uri);
+        for (int i=0;i < request->headerCount; i++) {
+            free(request->headers[i].headerName); // We don't need to free the headers value because it was allocated together with the header name
+        }
+        free(request->headers);
+        free(request);
+		free(response->body);
 
-		// char response[] = "HTTP/1.0 200 OK\n\nHello World!";
-		// char* response = getResponse(200, "Dazu noch ein bisschen frisches
-		// Asbest!"); printf("Sending: '%s'\n", response); send(clientSocket,
-		// response, strlen(response), 0);
-		//  free(response->body);
+        // Not freeing these will mean non readonly headers will cause memory leaks but who needs those anyway
+        /*
+        for(int i=0;i<response->headerCount; i++){
+            free(response->headers[i].headerName);
+            free(response->headers[i].value);
+        }
+        */
+        free(response->headers);
 		free(response);
 		// close(clientSocket);
 	}
