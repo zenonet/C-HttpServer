@@ -235,6 +235,10 @@ int main() {
 				if (startOfLine == i - 1)
 					break; // If this is the second line break in a row, break
 						   // from the loop
+                if(colonIndex == -1){
+                    printf("Colon in request header not found\n");
+                    break;
+                }
 
 				char *header = malloc(
 					i - startOfLine); // Yes, this means there is also space for
