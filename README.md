@@ -1,7 +1,10 @@
 # C HTTP Server
 
 This is a simple HTTP server implementation written in pure C as a challenge. I created this server to learn about C and Socket Programming (and NeoVim).
-You can try the server (as a client) [here](http://lx.zenonet.de:8080).
+
+## Why is this called CppHttpServer even though it's in pure C?
+
+When I started this project, I wanted to do it in C++ but I quickly realized that C might be a fun extra challenge so at some point, I changed the code I had so far to be C compliant. Now, it's 100% pure C.
 
 ## How it works
 
@@ -34,6 +37,6 @@ So, I could provide the docker image but I am too lazy to do so, so you gotta bu
 - Clone this Repository: `git clone https://github.com/zenonet/CppHttpServer.git`
 - Navigate into its directory: `cd CppHttpServer`
 - Build the Docker image: `docker build -t zenonet/chttp .`
-- Create a container with the just built image: `docker run --name cHttpServer .p 8080:8080 -t zenonet/chttp`
+- Create a container with the just built image: `docker run --name cHttpServer -p 8080:8080 -t zenonet/chttp`
 
 Now, you sould be able to access the server at localhost:8080
