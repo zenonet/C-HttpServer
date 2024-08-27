@@ -2,6 +2,9 @@
 
 This is a simple HTTP server implementation written in pure C as a challenge. I created this server to learn about C and Socket Programming (and NeoVim).
 
+![1000018603](https://github.com/user-attachments/assets/31011b26-4a1b-452e-87df-c7f42db61bee)
+
+
 ## Why is this called CppHttpServer even though it's in pure C?
 
 When I started this project, I wanted to do it in C++ but I quickly realized that C might be a fun extra challenge so at some point, I changed the code I had so far to be C compliant. Now, it's 100% pure C.
